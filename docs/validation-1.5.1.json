@@ -1,0 +1,45 @@
+{
+  "release": "1.5.1",
+  "versionCode": 7,
+  "package": "com.hassan.luqta",
+  "apk_sha256": "8885a0968afade076b26322e0c975a6d38db40f5baafbe3b05bc103536e8ba3f",
+  "apk_bytes": 57509653,
+  "signer_sha256": "dd874216db78d0885e7eec2b0305f39e4f4391697f6f68009387d242e9c96141",
+  "checks": {
+    "ui_mocked_ipc_calls": 33,
+    "brand_icons_in_header_preview_and_history": "verified",
+    "source_names_are_safe_text": true,
+    "icon_samples_on_light_and_dark_backgrounds": "SVG raster samples visually inspected",
+    "same_signing_certificate": true,
+    "assets_match_sources": true,
+    "signature_and_alignment": "verified",
+    "cleartext_traffic": false,
+    "source_signing_material": "excluded"
+  },
+  "changes": [
+    "Embedded SVG TikTok/YouTube/Instagram symbols replace plain text icons",
+    "Shared brand-icon and source-label helpers for source preview and download history",
+    "Brand icons on official source login buttons"
+  ],
+  "previous_release_checks": {
+    "video_engine_tests": 14,
+    "original_image_and_resume_tests": 7,
+    "social_photo_and_album_tests": 11,
+    "security_tests": 14,
+    "webview_document_checks": 15,
+    "lifecycle_and_storage_checks": 19,
+    "engine_archive_checks": 8,
+    "ui_mocked_ipc_calls": 33,
+    "assets_match_sources": true,
+    "signature_and_alignment": "verified",
+    "same_signing_certificate": true,
+    "cleartext_traffic": false,
+    "source_signing_material": "excluded"
+  },
+  "engine_unchanged_from_1_5_0": "Byte-compared Python engine and Java source against saved 1.5.0 source archive before packaging",
+  "untested": [
+    "Android installation and native ARM64 runtime",
+    "Full WebView layout on phone"
+  ],
+  "signing_limitation": "Removing the key from new source and changing its local password does not revoke copies present in previously shared source archives. Kept same certificate for compatible update."
+}

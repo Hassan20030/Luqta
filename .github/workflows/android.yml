@@ -1,0 +1,44 @@
+name: Build Luqta APK
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
+      - name: Download Eclipse Java compiler
+        run: curl --fail --location --output /tmp/ecj.jar https://repo.maven.apache.org/maven2/org/eclipse/jdt/ecj/3.38.0/ecj-3.38.0.jar
+      - name: Build and verify with private signing secrets
+        env:
+          LUQTA_KEYSTORE_BASE64: ${{ secrets.LUQTA_KEYSTORE_BASE64 }}
+          LUQTA_KEYSTORE_PASSWORD: ${{ secrets.LUQTA_KEYSTORE_PASSWORD }}
+          LUQTA_SIGNING_ALIAS: ${{ secrets.LUQTA_SIGNING_ALIAS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          signing_dir=$(mktemp -d "$RUNNER_TEMP/luqta-signing.XXXXXX")
+          trap 'rm -rf "$signing_dir"' EXIT
+          python3 - "$signing_dir" <<'PY'
+          import base64, os, sys
+          from pathlib import Path
+          folder = Path(sys.argv[1])
+          for name in ("LUQTA_KEYSTORE_BASE64", "LUQTA_KEYSTORE_PASSWORD", "LUQTA_SIGNING_ALIAS"):
+              if not os.environ.get(name):
+                  raise SystemExit("Configure the private signing secrets before building")
+          (folder / "release.p12").write_bytes(base64.b64decode(os.environ["LUQTA_KEYSTORE_BASE64"], validate=True))
+          (folder / "password.txt").write_text(os.environ["LUQTA_KEYSTORE_PASSWORD"] + "\n")
+          PY
+          python3 scripts/build.py --sdk "$ANDROID_HOME" --ecj /tmp/ecj.jar --keystore "$signing_dir/release.p12" --key-alias "$LUQTA_SIGNING_ALIAS" --password-file "$signing_dir/password.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Luqta-Android
+          path: outputs/Luqta-Android.apk

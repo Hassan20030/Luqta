@@ -1,0 +1,4 @@
+downloads/parts/*.part-* -text -diff
+app/src/main/res/raw/ytdlp -text -diff
+*.mp4 -text -diff
+*.jar -text -diff

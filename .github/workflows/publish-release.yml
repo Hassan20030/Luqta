@@ -1,0 +1,69 @@
+name: Publish verified Luqta release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - downloads/parts/**
+      - .github/workflows/publish-release.yml
+permissions:
+  contents: write
+concurrency:
+  group: publish-luqta-1.5.1
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack and verify prepared files
+        env:
+          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.5.1
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, zipfile
+          from pathlib import Path
+          folder = Path(os.environ['RELEASE_DIR'])
+          folder.mkdir(parents=True, exist_ok=True)
+          expected = {
+              'Luqta-Android.apk': '8885a0968afade076b26322e0c975a6d38db40f5baafbe3b05bc103536e8ba3f',
+              'Luqta-Android-Source.zip': 'fae4e4749fa8e77834ee9439b8827502e58bbd8387580b5e9b03a6ab4464abb8',
+          }
+          parts = Path('downloads/parts')
+          manifest = json.loads((parts / 'manifest.json').read_text())
+          packed = folder / 'distribution.zip'
+          total_hash = hashlib.sha256()
+          with packed.open('wb') as output:
+              for item in manifest['parts']:
+                  name = item['file']
+                  if Path(name).name != name:
+                      raise SystemExit('Invalid archive part path')
+                  data = (parts / name).read_bytes()
+                  if len(data) != item['bytes'] or hashlib.sha256(data).hexdigest() != item['sha256']:
+                      raise SystemExit('Archive part checksum mismatch: ' + name)
+                  output.write(data)
+                  total_hash.update(data)
+          if total_hash.hexdigest() != manifest['archive_sha256']:
+              raise SystemExit('Combined archive checksum mismatch')
+          with zipfile.ZipFile(packed) as archive:
+              for name, digest in expected.items():
+                  data = archive.read(name)
+                  if hashlib.sha256(data).hexdigest() != digest:
+                      raise SystemExit('Release checksum mismatch: ' + name)
+                  (folder / name).write_bytes(data)
+          (folder / 'SHA256SUMS').write_text(''.join(digest + '  ' + name + '\n' for name, digest in expected.items()))
+          PY
+      - name: Publish APK and source without signing secrets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.5.1
+        run: |
+          set -euo pipefail
+          gh release create v1.5.1 \
+            "$RELEASE_DIR/Luqta-Android.apk" \
+            "$RELEASE_DIR/Luqta-Android-Source.zip" \
+            "$RELEASE_DIR/SHA256SUMS" \
+            --target "$GITHUB_SHA" \
+            --title "لُقطة 1.5.1" \
+            --notes-file docs/release-1.5.1.md

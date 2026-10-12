@@ -33,3 +33,25 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Luqta build outputs and private signing files
+/build/
+/dependencies/
+/outputs/
+/node_modules/
+__pycache__/
+*.pyc
+*.jks
+*.keystore
+*.p12
+*.pfx
+*.key
+*.pem
+.env
+*password*
+*secret*
+/dev-signing/
+/private-signing/
+
+# Temporary combined distribution archives
+/downloads/*.zip

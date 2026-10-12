@@ -1,0 +1,6 @@
+{
+  "name": "luqta-android-checks",
+  "private": true,
+  "scripts": { "test:ui": "node scripts/test_ui.cjs" },
+  "devDependencies": { "jsdom": "26.1.0" }
+}
