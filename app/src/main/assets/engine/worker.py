@@ -1,10 +1,12 @@
 """One extraction/download path and a bounded recovery, with NDJSON events."""
 import json
+import math
 import os
 import shutil
 import subprocess
 import sys
 import time
+import threading
 from fractions import Fraction
 from pathlib import Path
 
@@ -64,10 +66,11 @@ def metadata(info):
 
 def probe_file(file):
     _, probe = tools()
-    result = subprocess.run([probe, *LOCAL_INPUT_ARGS, "-v", "error", "-show_streams", "-of", "json", str(file)], capture_output=True, text=True, timeout=30)
+    result = subprocess.run([probe, *LOCAL_INPUT_ARGS, "-v", "error", "-show_streams", "-show_format", "-of", "json", str(file)], capture_output=True, text=True, timeout=30)
     if result.returncode:
         raise ValueError("تعذّر التحقق من الملف الذي أعاده المصدر.")
-    streams = json.loads(result.stdout).get("streams", [])
+    details = json.loads(result.stdout)
+    streams = details.get("streams", [])
     videos = [s for s in streams if s.get("codec_type") == "video"]
     if not videos:
         return {"width": None, "height": None, "fps": None, "resolution": None}
@@ -87,7 +90,7 @@ def probe_file(file):
             pass
     audios = [s for s in streams if s.get("codec_type") == "audio"]
     return {"width": width, "height": height, "fps": fps, "resolution": min(width, height),
-            "duration": float(video.get("duration") or 0), "video_codec": video.get("codec_name"),
+            "duration": float(video.get("duration") or (details.get("format") or {}).get("duration") or 0), "video_codec": video.get("codec_name"),
             "pixel_format": video.get("pix_fmt"), "audio_codec": audios[0].get("codec_name") if audios else None}
 
 
@@ -102,31 +105,65 @@ def tiktok_copy(request):
     width, height = actual.get("width"), actual.get("height")
     if not width or not height:
         raise ValueError("الفيديو لا يحتوي مسار صورة صالحًا.")
-    if max(width, height) > 1920:
-        ratio = 1920 / max(width, height)
-        width, height = max(2, round(width * ratio / 2) * 2), max(2, round(height * ratio / 2) * 2)
-    filters = [f"scale={width}:{height}:flags=lanczos"]
-    if actual.get("fps") and actual["fps"] > 60.5:
-        filters.append("fps=60")
+    # H.264 4:2:0 needs even dimensions even for small sources. Fit both
+    # axes, including square/4:3 footage, without upscaling or cropping.
+    ratio = min(1, 1920 / max(width, height), 1080 / min(width, height))
+    width, height = max(2, int(width * ratio / 2) * 2), max(2, int(height * ratio / 2) * 2)
+    rate = actual.get("fps") or 30
+    rate = min(60, rate) if math.isfinite(rate) and rate > 0 else 30
+    filters = [f"scale={width}:{height}:flags=lanczos", "setsar=1", f"fps={rate}"]
     ffmpeg, _ = tools()
     emit({"status": "processing", "percent": None, "speed": 0, "eta": 0,
           "message": "جاري إنشاء نسخة متوافقة مع تيك توك"})
     command = [ffmpeg, *LOCAL_INPUT_ARGS, "-v", "error", "-y", "-i", str(source),
-               "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "0", "-vf", ",".join(filters),
+               "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "-1", "-map_chapters", "-1", "-vf", ",".join(filters),
                "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
                "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
-               "-movflags", "+faststart", str(output)]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=1800)
-    if result.returncode or not output.is_file() or not output.stat().st_size:
-        output.unlink(missing_ok=True)
-        raise ValueError("تعذّر تجهيز نسخة تيك توك على الهاتف.")
-    compatible = probe_file(output)
-    if compatible.get("video_codec") != "h264" or compatible.get("pixel_format") != "yuv420p" or compatible.get("fps", 0) > 60.5:
-        output.unlink(missing_ok=True)
-        raise ValueError("لم يجتز الملف فحص توافق تيك توك.")
-    if compatible.get("audio_codec") not in (None, "aac"):
-        output.unlink(missing_ok=True)
-        raise ValueError("لم يجتز صوت الملف فحص توافق تيك توك.")
+               "-movflags", "+faststart", "-progress", "pipe:1", "-nostats", str(output)]
+    process, deadline, valid = None, None, False
+    try:
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        deadline = threading.Timer(1800, process.kill)
+        deadline.daemon = True
+        deadline.start()
+        previous, last = -1, 0
+        for line in process.stdout:
+            key, _, value = line.strip().partition("=")
+            if key != "out_time_us":
+                continue
+            try:
+                elapsed = max(0, int(value)) / 1_000_000
+            except ValueError:
+                continue
+            duration = actual.get("duration") or 0
+            percent = min(99, int(elapsed / duration * 100)) if duration > 0 else None
+            now = time.monotonic()
+            if now - last >= 0.5 and (percent != previous or now - last >= 10):
+                emit({"status": "processing", "percent": percent, "speed": 0, "eta": 0,
+                      "message": "جاري إنشاء نسخة متوافقة مع تيك توك"})
+                previous, last = percent, now
+        if process.wait() or not output.is_file() or not output.stat().st_size:
+            raise ValueError("تعذّر تجهيز نسخة تيك توك على الهاتف.")
+        compatible = probe_file(output)
+        if (compatible.get("video_codec") != "h264" or compatible.get("pixel_format") != "yuv420p"
+                or not compatible.get("fps") or compatible["fps"] > 60.01
+                or max(compatible["width"], compatible["height"]) > 1920
+                or min(compatible["width"], compatible["height"]) > 1080):
+            raise ValueError("لم يجتز الملف فحص توافق تيك توك.")
+        if compatible.get("audio_codec") not in (None, "aac"):
+            raise ValueError("لم يجتز صوت الملف فحص توافق تيك توك.")
+        valid = True
+    finally:
+        if deadline:
+            deadline.cancel()
+        if process:
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+            if process.stdout:
+                process.stdout.close()
+        if not valid:
+            output.unlink(missing_ok=True)
     emit({"status": "done", "percent": 100, "filename": output.name, "size": output.stat().st_size,
           "speed": 0, "eta": 0, **compatible})
     return 0

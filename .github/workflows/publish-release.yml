@@ -9,7 +9,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: publish-luqta-1.6.0
+  group: publish-luqta-1.6.1
   cancel-in-progress: false
 jobs:
   release:
@@ -18,19 +18,20 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unpack and verify prepared files
         env:
-          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.6.0
+          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.6.1
         run: |
           python3 - <<'PY'
           import hashlib, json, os, zipfile
           from pathlib import Path
           folder = Path(os.environ['RELEASE_DIR'])
           folder.mkdir(parents=True, exist_ok=True)
-          expected = {
-              'Luqta-Android.apk': '0064908e34147a2ac9accac0d3edbd77549030e858e48c24cb574f3a9d9ad645',
-              'Luqta-Android-Source.zip': '4064827e425074243d95d6078f5844ecc1cb9a1724e277335eb65d06b1ea4786',
-          }
           parts = Path('downloads/parts')
           manifest = json.loads((parts / 'manifest.json').read_text())
+          if manifest['version'] != '1.6.1':
+              raise SystemExit('Release version mismatch')
+          expected = manifest['files']
+          if set(expected) != {'Luqta-Android.apk', 'Luqta-Android-Source.zip'}:
+              raise SystemExit('Unexpected release files')
           packed = folder / 'distribution.zip'
           total_hash = hashlib.sha256()
           with packed.open('wb') as output:
@@ -43,7 +44,7 @@ jobs:
                       raise SystemExit('Archive part checksum mismatch: ' + name)
                   output.write(data)
                   total_hash.update(data)
-          if total_hash.hexdigest() != manifest['archive_sha256']:
+          if packed.stat().st_size != manifest['archive_bytes'] or total_hash.hexdigest() != manifest['archive_sha256']:
               raise SystemExit('Combined archive checksum mismatch')
           with zipfile.ZipFile(packed) as archive:
               for name, digest in expected.items():
@@ -57,13 +58,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.6.0
+          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.6.1
         run: |
           set -euo pipefail
-          gh release create v1.6.0 \
+          gh release create v1.6.1 \
             "$RELEASE_DIR/Luqta-Android.apk" \
             "$RELEASE_DIR/Luqta-Android-Source.zip" \
             "$RELEASE_DIR/SHA256SUMS" \
             --target "$GITHUB_SHA" \
-            --title "لُقطة 1.6.0" \
-            --notes-file docs/release-1.6.0.md
+            --title "لُقطة 1.6.1" \
+            --notes-file docs/release-1.6.1.md

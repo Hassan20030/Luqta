@@ -4,15 +4,16 @@
   const all = selector => Array.from(document.querySelectorAll(selector));
   const state = { health: null, info: null, quality: 'best', imageQuality: 'best', imageIndex: 'all', fps: 'best', type: 'video', filter: 'all', busy: false, jobs: [], refreshing: false };
   const statuses = { queued: 'في الانتظار', extracting: 'جاري قراءة المصدر', retrying: 'جاري جلب رابط جديد وإعادة المحاولة', downloading: 'جاري التحميل', processing: 'جاري تجهيز الملف داخل الهاتف', done: 'اكتمل تجهيز الملف', error: 'تعذّر التحميل', cancelled: 'أُلغي التحميل', paused: 'موقوف مؤقتًا — الأجزاء محفوظة للاستكمال' };
-  const active = job => ['queued', 'extracting', 'retrying', 'downloading', 'processing'].includes(job.status);
-  const pending = new Map(), expandedErrors = new Set();
+  const pending = new Map(), expandedErrors = new Set(), pendingConversions = new Set();
+  const converting = job => pendingConversions.has(job.id) || job.tiktok_status === 'processing';
+  const active = job => converting(job) || ['queued', 'extracting', 'retrying', 'downloading', 'processing'].includes(job.status);
   let next = 0, toastTimer, pollTimer, inspectionVersion = 0;
 
   function api(path, method = 'GET', body = {}) {
     return new Promise((resolve, reject) => {
       const id = 'n-' + (++next);
-      const timeout = path.endsWith('/tiktok') ? 1800000 : path === '/api/engine/update' ? 180000 : path === '/api/info' ? 150000 : path === '/api/health' ? 100000 : 30000;
-      const timer = setTimeout(() => { pending.delete(id); reject(new Error('استغرقت العملية وقتًا طويلًا. تحقق من الاتصال ثم جرّب مجددًا.')); }, timeout);
+      const timeout = path.endsWith('/tiktok') ? 2100000 : path === '/api/engine/update' ? 180000 : path === '/api/info' ? 150000 : path === '/api/health' ? 100000 : 30000;
+      const timer = setTimeout(() => { pending.delete(id); reject(new Error(path.endsWith('/tiktok') ? 'استغرق تجهيز النسخة وقتًا طويلًا. تابع حالة التحويل في السجل أو ألغِه.' : 'استغرقت العملية وقتًا طويلًا. تحقق من الاتصال ثم جرّب مجددًا.')); }, timeout);
       pending.set(id, { resolve, reject, timer });
       try { NativeLuqta.postMessage(JSON.stringify({ id, path, method, body })); }
       catch { clearTimeout(timer); pending.delete(id); reject(new Error('تعذّر الاتصال بمحرك الهاتف. أعد فتح التطبيق.')); }
@@ -127,19 +128,26 @@
   }
   function jobAction(job, action, label) {
     const button = elem('button', 'save-btn', label);
+    button.dataset.action = action;
+    button.disabled = converting(job) && action !== 'tiktok-cancel';
     button.onclick = async () => {
+      if (action === 'tiktok' && converting(job)) return;
       if(action === 'remove' && !await confirmRemove('حذف «'+job.title+'» من السجل؟')) return;
       button.disabled = true;
+      if (action === 'tiktok') { pendingConversions.add(job.id); toast(job.tiktok_status === 'ready' ? 'جاري فتح خيارات المشاركة…' : 'جاري تجهيز نسخة تيك توك. تقدر تتابع التقدم هنا أو في الإشعار.'); renderJobs(); }
       try {
-        const result = await api('/api/jobs/' + job.id + '/' + action, 'POST');
+        const response = api('/api/jobs/' + job.id + '/' + action, 'POST');
+        if (action === 'tiktok') void refreshJobs();
+        const result = await response;
         if (action === 'export') toast('تم الحفظ في ' + result.saved_to);
         if (action === 'tiktok') toast(result.message || 'تم إنشاء نسخة متوافقة مع تيك توك.');
         if (action === 'retry') toast('جاري إعادة المحاولة برابط جديد.');
         if (action === 'pause') toast('أُوقف التحميل مؤقتًا؛ الأجزاء محفوظة.');
+        if (action === 'tiktok-cancel') toast('أُلغي تجهيز نسخة تيك توك.');
         if (action === 'resume') toast('جاري استكمال التحميل.');
-        if (['retry', 'cancel', 'pause', 'resume', 'export', 'remove'].includes(action)) await refreshJobs();
+        if (['retry', 'cancel', 'pause', 'resume', 'export', 'remove', 'tiktok-cancel'].includes(action)) await refreshJobs();
       } catch (e) { toast(e.message); }
-      finally { button.disabled = false; }
+      finally { button.disabled = false; if (action === 'tiktok') { pendingConversions.delete(job.id); await refreshJobs(); } }
     };
     return button;
   }
@@ -151,6 +159,7 @@
     $('empty-state').querySelector('h3').textContent = jobs.length ? 'ما فيه تحميلات في هذا القسم' : 'أول لقطة تنتظرك';
     $('empty-state').querySelector('p').textContent = jobs.length ? 'اختر قسمًا ثانيًا لعرض بقية السجل.' : 'ابدأ برابط فيديو، وبتلقى تحميلاتك هنا.';
     visible.forEach(job => {
+      const copying = converting(job), percent = copying ? job.tiktok_percent : job.percent;
       const card = elem('article', 'job ' + job.status), ji = elem('span', 'job-icon'); ji.append(icon(job.kind === 'image' ? 'image' : ['mp3', 'm4a'].includes(job.format) ? 'music' : 'play'));
       const content = elem('div', 'job-info'); content.append(elem('h3', '', job.title || 'مقطع فيديو'));
       const date = new Date(job.created_at).toLocaleDateString('ar-SA', { month: 'short', day: 'numeric' });
@@ -160,8 +169,8 @@
       const meta = elem('div', 'job-meta');
       if (job.source) meta.append(sourceLabel(job.source));
       meta.append(elem('span', '', [(job.format || '').toUpperCase(), pixels, rate, job.album_count > 1 ? 'صورة ' + job.album_position + '/' + job.album_count : '', size(job.size), date].filter(Boolean).join(' • '))); content.append(meta);
-      const status = elem('div', 'job-status'); status.append(elem('span', '', job.error || job.save_error || (job.resume_requested ? 'جاري الاستكمال بعد توقف المحرك…' : job.message || (job.export_uri ? 'محفوظ على الجهاز' : statuses[job.status]))));
-      if (active(job)) status.append(elem('span', '', [job.percent != null ? Math.round(job.percent) + '%' : '', job.speed ? size(job.speed) + '/s' : '', job.status === 'downloading' && job.eta ? 'وقت المسار: ' + duration(job.eta) : ''].filter(Boolean).join(' • ')));
+      const status = elem('div', 'job-status'); status.append(elem('span', '', copying ? 'جاري تجهيز نسخة تيك توك…' : job.tiktok_status === 'error' ? job.tiktok_error : job.tiktok_status === 'cancelled' ? 'أُلغي تجهيز نسخة تيك توك؛ الفيديو الأصلي باقٍ' : job.tiktok_status === 'ready' ? 'نسخة تيك توك محفوظة وجاهزة للمشاركة' : job.error || job.save_error || (job.resume_requested ? 'جاري الاستكمال بعد توقف المحرك…' : job.message || (job.export_uri ? 'محفوظ على الجهاز' : statuses[job.status]))));
+      if (active(job)) status.append(elem('span', '', [percent != null ? Math.round(percent) + '%' : '', !copying && job.speed ? size(job.speed) + '/s' : '', job.status === 'downloading' && job.eta ? 'وقت المسار: ' + duration(job.eta) : ''].filter(Boolean).join(' • ')));
       content.append(status);
       if (job.status === 'error' && job.error_detail) {
         const details = elem('details', 'job-error-details'); details.open = expandedErrors.has(job.id);
@@ -169,19 +178,20 @@
         details.ontoggle = () => details.open ? expandedErrors.add(job.id) : expandedErrors.delete(job.id); content.append(details);
       }
       if (active(job)) {
-        const track = elem('div', 'progress-track' + (job.percent == null ? ' indeterminate' : '')); track.setAttribute('role', 'progressbar'); track.setAttribute('aria-label', statuses[job.status]);
-        if (job.percent != null) track.setAttribute('aria-valuenow', String(job.percent));
-        const fill = elem('span'); if (job.percent != null) fill.style.width = Math.min(100, Math.max(0, job.percent)) + '%'; track.append(fill); content.append(track);
+        const track = elem('div', 'progress-track' + (percent == null ? ' indeterminate' : '')); track.setAttribute('role', 'progressbar'); track.setAttribute('aria-label', copying ? 'تجهيز نسخة تيك توك' : statuses[job.status]);
+        if (percent != null) track.setAttribute('aria-valuenow', String(percent));
+        const fill = elem('span'); if (percent != null) fill.style.width = Math.min(100, Math.max(0, percent)) + '%'; track.append(fill); content.append(track);
       }
       const actions = elem('div', 'job-actions');
       if (job.status === 'done') {
         for (const [action, label] of [['export', 'حفظ على الجهاز'], ['open', 'فتح'], ['share', 'مشاركة']]) actions.append(jobAction(job, action, label));
-        if (video) actions.append(jobAction(job, 'tiktok', 'نسخة تيك توك'));
+        if (video) actions.append(jobAction(job, 'tiktok', copying ? 'جاري التجهيز…' : job.tiktok_status === 'ready' ? 'مشاركة نسخة تيك توك' : 'نسخة تيك توك'));
       }
+      if (copying) actions.append(jobAction(job, 'tiktok-cancel', 'إلغاء التحويل'));
       if (job.retryable) actions.append(jobAction(job, 'retry', 'إعادة المحاولة'));
       if (job.resumable && !job.resume_requested) actions.append(jobAction(job, 'resume', 'استكمال'));
-      if (active(job)) actions.append(jobAction(job, 'pause', 'إيقاف مؤقت'));
-      if (active(job) || job.status === 'paused') actions.append(jobAction(job, 'cancel', 'إلغاء'));
+      if (active(job) && job.status !== 'done') actions.append(jobAction(job, 'pause', 'إيقاف مؤقت'));
+      if ((active(job) && job.status !== 'done') || job.status === 'paused') actions.append(jobAction(job, 'cancel', 'إلغاء'));
       actions.append(jobAction(job,'remove','حذف من السجل'));
       card.append(ji, content, actions); list.append(card);
     });

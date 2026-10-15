@@ -21,6 +21,7 @@ let jobs = [
   { ...base, id: doneId, status: 'done', percent: 100, size: 1543410, width: 2160, height: 3840, fps: 120, resolution: 2160 }
 ];
 let health = { mode: 'engine', ytdlp: '2026.08.19', ffmpeg: true, quickjs: true, ejs: '0.8.0' };
+let tiktokResponse;
 w.NativeLuqta = {
   readClipboard: () => 'https://media.example/test.mp4',
   postMessage(text) {
@@ -28,7 +29,16 @@ w.NativeLuqta = {
     w.setTimeout(() => {
       let data;
       try {
-        if (request.path === '/api/engine/update') { health = { ...health, ytdlp: '2099.01.01' }; data = health; }
+        if (request.path.endsWith('/tiktok')) {
+          const job = jobs.find(j => j.id === doneId);
+          if (job.tiktok_status === 'ready') data = job.tiktok_copy;
+          else { job.tiktok_status = 'processing'; job.tiktok_percent = 40; tiktokResponse = request.id; return; }
+        }
+        else if (request.path.endsWith('/tiktok-cancel')) {
+          const job = jobs.find(j => j.id === doneId); job.tiktok_status = 'cancelled'; delete job.tiktok_percent;
+          w.__luqtaReply(tiktokResponse, {ok:false,error:'أُلغي تجهيز نسخة تيك توك.'}); tiktokResponse = null; data = {ok:true};
+        }
+        else if (request.path === '/api/engine/update') { health = { ...health, ytdlp: '2099.01.01' }; data = health; }
         else if (request.path === '/api/health') data = health;
         else if (request.path === '/api/settings') data = request.method === 'GET' ? {fragments:4,restore:true,auto_save:false} : request.body;
         else if (request.path === '/api/storage' || request.path === '/api/storage/clean') data = request.path.endsWith('/clean') ? {removed:512,storage:{free:1e9,temporary:0,retained:512,unsaved:1024}} : {free:1e9,temporary:512,retained:512,unsaved:1024};
@@ -68,7 +78,7 @@ async function until(condition) {
     assert.ok($('.job.retrying .progress-track.indeterminate'));
     assert.ok($('.job.error').textContent.includes('403'));
     click('.job.error summary'); assert.ok($('.job.error details').open);
-    assert.equal(doc.querySelectorAll('.job.done .job-actions button').length, 4);
+    assert.equal(doc.querySelectorAll('.job.done .job-actions button').length, 5);
     assert.ok($('.job.done .job-meta').textContent.includes('2160×3840'));
     assert.ok($('.job.done .job-meta').textContent.includes('120 FPS'));
     click('.job.error button'); await until(() => !$('.job.error'));
@@ -80,6 +90,29 @@ async function until(condition) {
     click('.job.done button'); await until(() => $('#toast').textContent.includes('Movies/Luqta'));
     doc.querySelectorAll('.job.done button')[1].click();
     doc.querySelectorAll('.job.done button')[2].click();
+    click('.job.done [data-action="tiktok"]');
+    await until(() => tiktokResponse && $('.job.done [data-action="tiktok"]').disabled);
+    await until(() => $('.job.done .progress-track[aria-valuenow="40"]'));
+    const conversions = calls.filter(c => c.path.endsWith('/tiktok')).length;
+    click('.job.done [data-action="tiktok"]');
+    click('.job.done [data-action="remove"]');
+    assert.equal(calls.filter(c => c.path.endsWith('/tiktok')).length, conversions, 'Repeated taps must not queue another conversion');
+    assert.ok(!$('#confirm-dialog').open, 'History deletion is disabled while conversion is active');
+    const converted = jobs.find(j => j.id === doneId);
+    converted.tiktok_status = 'ready'; converted.tiktok_percent = 100;
+    converted.tiktok_copy = {uri:'content://media/video/42',mime:'video/mp4',message:'حُفظت نسخة تيك توك.'};
+    w.__luqtaReply(tiktokResponse, {ok:true,data:converted.tiktok_copy}); tiktokResponse = null;
+    await until(() => $('.job.done [data-action="tiktok"]').textContent === 'مشاركة نسخة تيك توك');
+    assert.equal($('.job.done .progress-track'), null);
+    click('.job.done [data-action="tiktok"]');
+    await until(() => !$('.job.done [data-action="tiktok"]').disabled);
+    assert.equal(tiktokResponse, null, 'Sharing an existing copy must not start another conversion');
+    delete converted.tiktok_copy; delete converted.tiktok_status;
+    click('.job.done [data-action="tiktok"]');
+    await until(() => tiktokResponse && $('.job.done [data-action="tiktok-cancel"]'));
+    click('.job.done [data-action="tiktok-cancel"]');
+    await until(() => !tiktokResponse && !$('.job.done [data-action="tiktok"]').disabled);
+    assert.ok($('.job.done .job-status').textContent.includes('أُلغي'));
     click('#paste-btn'); assert.equal($('#url-input').value, 'https://media.example/test.mp4');
     const beforeInvalid = calls.filter(c => c.path === '/api/info').length;
     for (const url of ['http://media.example/test.mp4', 'https://media.example:80/test.mp4', 'https://user:pass@media.example/test.mp4']) {
@@ -129,15 +162,15 @@ async function until(condition) {
     $('#image-quality').value='best';$('#image-quality').dispatchEvent(new w.Event('change'));click('#action-btn');await until(()=>calls.filter(c=>c.path==='/api/jobs' && c.method==='POST').length===3);
     const imageJob=calls.filter(c=>c.path==='/api/jobs' && c.method==='POST').at(-1).body;assert.deepEqual(imageJob.selected_images,[0]);assert.equal(imageJob.kind,'image');assert.equal(imageJob.quality,'best');assert.equal(imageJob.fps,'best');
     assert.equal(doc.querySelectorAll('.album-photo').length,2);
-    const doneButtons=doc.querySelectorAll('.job.done button');doneButtons[3].click();await until(()=>$('#confirm-dialog').open);
+    const removeDone=()=>click('.job.done [data-action="remove"]');removeDone();await until(()=>$('#confirm-dialog').open);
     assert.ok($('#confirm-message').textContent.includes('حذف'));click('#confirm-reject');assert.ok($('.job.done'),'Cancel keeps the history row');
-    doneButtons[3].click();await until(()=>$('#confirm-dialog').open);click('#confirm-accept');await until(()=>!$('.job.done'));
+    removeDone();await until(()=>$('#confirm-dialog').open);click('#confirm-accept');await until(()=>!$('.job.done'));
     click('[data-login="instagram"]');await until(()=>calls.some(c=>c.path==='/api/source/login'));
     $('#fragments-select').value='8';$('#fragments-select').dispatchEvent(new w.Event('change'));await until(()=>$('#settings-result').textContent.includes('حُفظت'));
     assert.equal(calls.filter(c=>c.path==='/api/settings' && c.method==='POST').at(-1).body.fragments,8);
     click('#clean-storage');await until(()=>$('#toast').textContent.includes('512'));
     assert.deepEqual(errors, []);
-    for (const action of ['retry', 'pause', 'resume', 'cancel', 'export', 'open', 'share', 'remove']) assert.ok(calls.some(c => c.path.endsWith('/' + action)));
+    for (const action of ['retry', 'pause', 'resume', 'cancel', 'export', 'open', 'share', 'remove', 'tiktok', 'tiktok-cancel']) assert.ok(calls.some(c => c.path.endsWith('/' + action)));
     console.log(JSON.stringify({ result: 'passed', ipcCalls: calls.length, errors, check: 'DOM and mocked Android IPC' }));
   } finally { dom.window.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

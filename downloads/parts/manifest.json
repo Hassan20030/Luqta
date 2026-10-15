@@ -1,112 +1,116 @@
 {
-  "version": "1.6.0",
-  "archive_bytes": 62111392,
-  "archive_sha256": "9589e22ae141c4c17fdf5801d6d5693ee1980353629756ad1f8845b62226f7af",
+  "version": "1.6.1",
+  "archive_bytes": 62117551,
+  "archive_sha256": "7ccb55d0f0239eec064a6b9ba16d43e12a79d46d714874ac4fbfccc9c2ede339",
+  "files": {
+    "Luqta-Android.apk": "ed087306c1347e70b0340a1f90e4cd1883199560b1da4e5389c0cfbe081f2909",
+    "Luqta-Android-Source.zip": "83e71538c823732c5e58fef98036aaaa3c88eb0f42114e824237923e67619e19"
+  },
   "parts": [
     {
-      "file": "part-000.bin",
+      "file": "luqta-1.6.1.part-000",
       "bytes": 3000000,
-      "sha256": "9320f06220c6831cf1b7c7dc54cfd10f56760e7d1ad571c73fa25dcf3f22aa6f"
+      "sha256": "4c030272e35faed6acb7dbfaf2cbaebfdba6b3e74e44fd381eb56e7cccf8ea08"
     },
     {
-      "file": "part-001.bin",
+      "file": "luqta-1.6.1.part-001",
       "bytes": 3000000,
-      "sha256": "404829721b88ccd9ab2af95b695ca9e7e712e8496b15e5b156968615c789ecdf"
+      "sha256": "e8628aa23bc35d7f638b38581210d9efba8bd476ec7e828bdc4db8b881ea1f6b"
     },
     {
-      "file": "part-002.bin",
+      "file": "luqta-1.6.1.part-002",
       "bytes": 3000000,
-      "sha256": "a3ad0505f1e352d1fc0d5ae4c797aed1e73c78520595e5288b3a84afdb07511e"
+      "sha256": "52a4628b96600003a03bf302f1ffda24ba5dc119b0a2bdf9bb48f12bdec2a9c4"
     },
     {
-      "file": "part-003.bin",
+      "file": "luqta-1.6.1.part-003",
       "bytes": 3000000,
-      "sha256": "da95821431af6765e93db8dd3fa71a095331a9117829ba1d6bb17d48bdb5873e"
+      "sha256": "22382a4419d2c5c384e5528b0f19e601c5c1dc26cb5c7013a81f90e432315c18"
     },
     {
-      "file": "part-004.bin",
+      "file": "luqta-1.6.1.part-004",
       "bytes": 3000000,
-      "sha256": "8b30a3608f16ee602505813d205ed67e1f93a7eab0353341199a6bf086516121"
+      "sha256": "40e3592b0f025903d720c7b657d130ca57d76bb5b8058cb8782bb6017ee150a6"
     },
     {
-      "file": "part-005.bin",
+      "file": "luqta-1.6.1.part-005",
       "bytes": 3000000,
-      "sha256": "db00dde2653ebda9e40fd211bb93fff32cb48179e66478ca7dfe235a00f5fb79"
+      "sha256": "5d9a4bf4e7211f4c652d249cc660a0eea4e4e452241a29a3d2b23676fa10cee0"
     },
     {
-      "file": "part-006.bin",
+      "file": "luqta-1.6.1.part-006",
       "bytes": 3000000,
-      "sha256": "0f4af2f4b80e4a8848f1e2017570f31b21ddbc90911c7fb71e17def624371609"
+      "sha256": "beb770ca378a8d505b0b56d5b5046e1ad6dafe375dad7d7d9dc871a69a5c9a22"
     },
     {
-      "file": "part-007.bin",
+      "file": "luqta-1.6.1.part-007",
       "bytes": 3000000,
-      "sha256": "c5398105545201b994e401b88b596eec5e3f7b0ee49c977a8ef369fb1b9cca44"
+      "sha256": "30bd6c6c0cb697b1fe357f889e2e59b99f5920e2e8e4a3e3576e43d9cee7728d"
     },
     {
-      "file": "part-008.bin",
+      "file": "luqta-1.6.1.part-008",
       "bytes": 3000000,
-      "sha256": "c75475a86cadc68fb72c0a7ef5a58ecc47209e973aa69ad7d18f0cc980ba8587"
+      "sha256": "1c677000ce456c0af1043a6a70e95c691fb5340e7cfbd0699c73e3dfe1fc3f28"
     },
     {
-      "file": "part-009.bin",
+      "file": "luqta-1.6.1.part-009",
       "bytes": 3000000,
-      "sha256": "178b6d33c9bf2b6f5638f3b2e5ab064a5621e45b8aa1d67e074261cb78b80874"
+      "sha256": "b75c23783b31c70e00aae9a123dff7afbadd37ff0de1215f19015b8eebc4396a"
     },
     {
-      "file": "part-010.bin",
+      "file": "luqta-1.6.1.part-010",
       "bytes": 3000000,
-      "sha256": "4bad654f7de776450c78b16e75d5f8c053d731e3bc893ee655f70b8be31dc5f5"
+      "sha256": "149776c4611a86a560fba9b108e84e41e291ff7bf561df167b6fc8cdfddc505a"
     },
     {
-      "file": "part-011.bin",
+      "file": "luqta-1.6.1.part-011",
       "bytes": 3000000,
-      "sha256": "5967f4ba7df2bf78b35391c5f42526138571752fe2607cae7012aa54bd89367a"
+      "sha256": "ced229df0cd782ab2714af1f74c9543e64cc2d7b8a14bcbbb3a6f4bec4a9e7a0"
     },
     {
-      "file": "part-012.bin",
+      "file": "luqta-1.6.1.part-012",
       "bytes": 3000000,
-      "sha256": "09e57f2697c1ee17b8cdbf97b5ba2129e26b30054798aa68f580cf2ec9e60f40"
+      "sha256": "fe36f61de9807fa62493ba2052f0911c9ccb665b9758cad07eb9f5eb7c3ff2f6"
     },
     {
-      "file": "part-013.bin",
+      "file": "luqta-1.6.1.part-013",
       "bytes": 3000000,
-      "sha256": "c286f944091e4879c2f150d116aded02eb7fe5881e1bd6d3254962096d3b6636"
+      "sha256": "0355031bdd3343a946e96916e86b6355da3a067e3fcd8d389cbff258f711ccfd"
     },
     {
-      "file": "part-014.bin",
+      "file": "luqta-1.6.1.part-014",
       "bytes": 3000000,
-      "sha256": "eed5c83f88b2e31205437ea41a2337f98479a57644d38793222355eeb3719dab"
+      "sha256": "f2d930621c86136c9a8b1a3486ba90a75ff7ab8868720451ca8639f9e9b5e903"
     },
     {
-      "file": "part-015.bin",
+      "file": "luqta-1.6.1.part-015",
       "bytes": 3000000,
-      "sha256": "f022779d2cc4dbbdfebd57f3da85110d2ca11918a78d77649f7fbe62d923dff5"
+      "sha256": "15f18428bd5dccec17f148c776b1c53acd4267e79f1a0d2354ed9bf535d66822"
     },
     {
-      "file": "part-016.bin",
+      "file": "luqta-1.6.1.part-016",
       "bytes": 3000000,
-      "sha256": "11bf4c08dbdde43085ad374447b72f44d87985d036b0aa0057c24d4b9aa49f04"
+      "sha256": "876a28a5535fb3004ccaa5db5abe8828391548faa7d818ba287e78eab6430b6a"
     },
     {
-      "file": "part-017.bin",
+      "file": "luqta-1.6.1.part-017",
       "bytes": 3000000,
-      "sha256": "ce62299ee7e0679071a2d59fd93cb1ce42de71b3a68ec2c2b07d5104b1d1348c"
+      "sha256": "0c431ac3772884d66dae864afe4f8c0c20f33f604e107933e6ef880973297851"
     },
     {
-      "file": "part-018.bin",
+      "file": "luqta-1.6.1.part-018",
       "bytes": 3000000,
-      "sha256": "a2e7dfb9ab4e94d434a886981a4c21e383cf156b515582894f9ff449f35a727d"
+      "sha256": "d28f075cb9d9e6d9ee356db899e87269e19d2b789a0fcb44fc9ee3c82132425c"
     },
     {
-      "file": "part-019.bin",
+      "file": "luqta-1.6.1.part-019",
       "bytes": 3000000,
-      "sha256": "eb5b74a527805cdb25093388c3668d9ee76ce9c05fb5b62c1df6d787c56d4f17"
+      "sha256": "659c728683e1ebe37e5a860705b5acda9f9e879d10130c52222c2d1c2b2aa18e"
     },
     {
-      "file": "part-020.bin",
-      "bytes": 2111392,
-      "sha256": "ca9c891ccfae0dbdb91def0931e1c80af24e851af4660f20a16cd5fd60ea4b0b"
+      "file": "luqta-1.6.1.part-020",
+      "bytes": 2117551,
+      "sha256": "fef918ea750f3abee9633412cc7b2a5698fbe873d83bbdc8998eb9b6ee2b8321"
     }
   ]
 }

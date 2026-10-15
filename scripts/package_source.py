@@ -3,8 +3,8 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DIRECTORIES = ("app", "scripts", "third-party-source", ".github")
-FILES = ("README_AR.md", "THIRD_PARTY_NOTICES.md", "LICENSE", "dependency-lock.json", "package.json", ".gitignore")
+DIRECTORIES = ("app", "scripts", "third-party-source", ".github", "docs")
+FILES = ("README.md", "README_AR.md", "THIRD_PARTY_NOTICES.md", "LICENSE", "dependency-lock.json", "package.json", ".gitignore")
 FORBIDDEN = {".jks", ".keystore", ".p12", ".pfx", ".key", ".pem", ".env"}
 
 

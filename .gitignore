@@ -39,6 +39,7 @@ google-services.json
 /dependencies/
 /outputs/
 /node_modules/
+/checks/
 __pycache__/
 *.pyc
 *.jks

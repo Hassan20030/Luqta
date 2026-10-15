@@ -1,0 +1,31 @@
+{
+  "release": "1.6.1",
+  "versionCode": 9,
+  "package": "com.hassan.luqta",
+  "apk_sha256": "ed087306c1347e70b0340a1f90e4cd1883199560b1da4e5389c0cfbe081f2909",
+  "apk_bytes": 57505557,
+  "signer_sha256": "dd874216db78d0885e7eec2b0305f39e4f4391697f6f68009387d242e9c96141",
+  "checks": {
+    "python_regressions": 51,
+    "ui_mocked_ipc_calls": 42,
+    "download_lifecycle_and_storage": 19,
+    "engine_archive": 8,
+    "webview_document_boundary": 15,
+    "android_java_compilation": true,
+    "assets_match_source": true,
+    "dex_matches_build": true,
+    "signature_and_16kb_alignment": "verified",
+    "same_signing_certificate": true,
+    "dependencies_match_tracked_lock": true
+  },
+  "changes": [
+    "Even dimensions and bounded square/portrait conversion",
+    "CFR H.264/yuv420p with optional AAC, measured progress and rotation handling",
+    "Foreground conversion with duplicate prevention and cancellation",
+    "Persistent TikTok copy reused for sharing; restore interrupted conversion as retryable error"
+  ],
+  "untested": [
+    "Android installation and ARM64 runtime on a phone/emulator",
+    "MediaStore, background service, notifications and actual TikTok import on Android"
+  ]
+}

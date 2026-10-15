@@ -18,8 +18,8 @@ final class JobManager {
     private final LinkedHashMap<String,JSONObject> jobs=new LinkedHashMap<>();
     private final Set<String> scheduled=new HashSet<>();
     private final Set<String> exporting=new HashSet<>();
+    private final Set<String> converting=new HashSet<>();
     private final ExecutorService downloads=Executors.newSingleThreadExecutor();
-    private final ConcurrentHashMap<String,Object> exportLocks=new ConcurrentHashMap<>();
     private long lastPersist;
     private static final List<String> EVENT_FIELDS=Arrays.asList("status","percent","speed","eta","downloaded","title","source","filename","size","width","height","resolution","fps","original_width","original_height","kind","format","is_4k","message","error","error_detail","warnings");
     JobManager(Context c,NativeEngine e) {
@@ -32,6 +32,7 @@ final class JobManager {
                 if(!id.matches("[a-f0-9]{32}")) continue;
                 String status=DownloadState.restore(j.optString("status"),settings.getBoolean("restore",true),j.has("url"));
                 Json.put(j,"status",status);j.remove("resume_requested");
+                if("processing".equals(j.optString("tiktok_status"))){Json.put(j,"tiktok_status","error");Json.put(j,"tiktok_error","توقف تجهيز نسخة تيك توك. اضغط نسخة تيك توك للمحاولة مجددًا.");j.remove("tiktok_percent");}
                 if("queued".equals(status) || "paused".equals(status)){Json.put(j,"speed",0);Json.put(j,"eta",0);j.remove("error");}
                 jobs.put(id,j);
                 if("deleted".equals(status)) cleanJob(id,j);
@@ -58,7 +59,7 @@ final class JobManager {
         if(!settings.edit().putInt("fragments",fragments).putBoolean("restore",data.optBoolean("restore",settings.getBoolean("restore",true))).putBoolean("auto_save",data.optBoolean("auto_save",settings.getBoolean("auto_save",false))).commit()) throw new IOException("تعذّر حفظ الإعدادات.");
         return preferences();
     }
-    synchronized int activeCount(){int n=0;for(JSONObject j:jobs.values()) if(DownloadState.active(j.optString("status")) || j.optBoolean("resume_requested") || (scheduled.contains(j.optString("id")) && "done".equals(j.optString("status")))) n++;return n;}
+    synchronized int activeCount(){int n=converting.size();for(JSONObject j:jobs.values()) if(DownloadState.active(j.optString("status")) || j.optBoolean("resume_requested") || (scheduled.contains(j.optString("id")) && "done".equals(j.optString("status")))) n++;return n;}
     synchronized boolean hasPending(){for(JSONObject j:jobs.values()) if("queued".equals(j.optString("status"))) return true;return false;}
     synchronized JSONObject list() throws JSONException {
         List<JSONObject> data=new ArrayList<>(jobs.values());Collections.reverse(data);JSONArray result=new JSONArray();
@@ -142,8 +143,8 @@ final class JobManager {
         DownloadService.changed(context);
     }
     void cancel(String id){stop(id,false);}
-    void pauseAll(){List<String> ids;synchronized(this){ids=new ArrayList<>(jobs.keySet());}for(String id:ids) stop(id,true);}
-    void cancelAll(){List<String> ids;synchronized(this){ids=new ArrayList<>(jobs.keySet());}for(String id:ids) cancel(id);}
+    void pauseAll(){List<String> ids;synchronized(this){ids=new ArrayList<>(jobs.keySet());}for(String id:ids){stop(id,true);cancelTiktok(id);}}
+    void cancelAll(){List<String> ids;synchronized(this){ids=new ArrayList<>(jobs.keySet());}for(String id:ids){cancel(id);cancelTiktok(id);}}
     synchronized JSONObject enqueueBatch(JSONArray entries) throws Exception {
         if(entries.length()==0 || entries.length()>50) throw new IOException("عدد الصور غير صحيح؛ الحد 50.");
         int retained=0;for(JSONObject job:jobs.values()) if(DownloadState.preserveFiles(job.optString("status"),false)) retained++;
@@ -195,45 +196,66 @@ final class JobManager {
     }
     synchronized JSONObject clean(){long bytes=orphans(true);for(Map.Entry<String,JSONObject> e:jobs.entrySet()) if(!exporting.contains(e.getKey()) && !DownloadState.preserveFiles(e.getValue().optString("status"),scheduled.contains(e.getKey()))) bytes+=cleanJob(e.getKey(),e.getValue());return Json.object("removed",bytes,"storage",storage());}
     JSONObject export(String id) throws Exception {
-        synchronized(exportLocks.computeIfAbsent(id,key -> new Object())){
-            synchronized(this){exporting.add(id);}
-            try{return exportInternal(id);}finally{synchronized(this){exporting.remove(id);}}
+        synchronized(this){if(!exporting.add(id)) throw new IOException("انتظر انتهاء حفظ الملف أو تحويله.");}
+        try{return exportInternal(id);}finally{synchronized(this){exporting.remove(id);}}
+    }
+    JSONObject tiktok(String id,Runnable onStart) throws Exception {
+        JSONObject job;
+        synchronized(this){
+            JSONObject source=jobs.get(id);
+            if(source==null || !"done".equals(source.optString("status")) || !"video".equals(source.optString("kind")) || !Arrays.asList("mp4","webm").contains(source.optString("format"))) throw new IOException("هذا العنصر ليس فيديو جاهزًا.");
+            if(!exporting.add(id)) throw new IOException("جاري تجهيز الملف بالفعل. انتظر اكتمال العملية.");
+            job=new JSONObject(source.toString());
+        }
+        File temporarySource=null,output=null;
+        try{
+            JSONObject previous=job.optJSONObject("tiktok_copy");
+            if(previous!=null){
+                try(android.os.ParcelFileDescriptor file=context.getContentResolver().openFileDescriptor(Uri.parse(previous.getString("uri")),"r")){if(file!=null) return previous;}catch(Exception ignored){}
+            }
+            synchronized(this){if(!converting.isEmpty()) throw new IOException("انتظر انتهاء تحويل الفيديو الجاري أولًا.");converting.add(id);JSONObject source=jobs.get(id);Json.put(source,"tiktok_status","processing");Json.put(source,"tiktok_percent",JSONObject.NULL);source.remove("tiktok_error");source.remove("tiktok_copy");persist();}
+            onStart.run();
+            File folder=new File(root,id),local=new File(folder,job.optString("filename"));
+            if(!local.getCanonicalPath().startsWith(folder.getCanonicalPath()+File.separator)) throw new IOException("مسار الفيديو غير صالح.");
+            File cache=new File(context.getCacheDir(),"luqta-tiktok");cache.mkdirs();
+            File input=local;
+            if(!local.isFile()){
+                String saved=job.optString("export_uri");if(saved.isEmpty()) throw new IOException("الفيديو لم يعد موجودًا. نزّله مجددًا ثم جرّب.");
+                temporarySource=new File(cache,id+"-source."+job.optString("format","mp4"));
+                try(InputStream in=context.getContentResolver().openInputStream(Uri.parse(saved));OutputStream out=new FileOutputStream(temporarySource)){if(in==null) throw new IOException("تعذّر قراءة الفيديو المحفوظ.");NativeEngine.copy(in,out);}
+                input=temporarySource;
+            }
+            if(input.length()<1) throw new IOException("الفيديو فارغ.");
+            if(cache.getUsableSpace()<Math.min(Math.max(input.length()*2,300L*1024*1024),2L*1024*1024*1024)) throw new IOException("المساحة المتاحة لا تكفي لإنشاء نسخة تيك توك.");
+            output=new File(cache,id+"-TikTok.mp4");if(output.exists()) output.delete();
+            JSONObject actual=engine.tiktok(input,output,id+"-tiktok",event -> {
+                synchronized(JobManager.this){JSONObject source=jobs.get(id);if(source!=null && "processing".equals(source.optString("tiktok_status")) && event.has("percent")) Json.put(source,"tiktok_percent",event.opt("percent"));}
+                DownloadService.changed(context);
+            });
+            requireTiktokActive(id);
+            String base=job.optString("filename","Luqta").replaceFirst("\\.[^.]+$","");if(base.length()>180) base=base.substring(0,180);
+            ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.DISPLAY_NAME,base+"_TikTok.mp4");values.put(MediaStore.MediaColumns.MIME_TYPE,"video/mp4");values.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/Luqta");values.put(MediaStore.MediaColumns.IS_PENDING,1);
+            ContentResolver resolver=context.getContentResolver();Uri uri=resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,values);if(uri==null) throw new IOException("تعذّر إنشاء نسخة تيك توك في الهاتف.");
+            try{
+                try(InputStream in=new FileInputStream(output);OutputStream out=resolver.openOutputStream(uri,"w")){if(out==null) throw new IOException("تعذّر حفظ نسخة تيك توك.");NativeEngine.copy(in,out);}
+                JSONObject saved=Json.object("uri",uri.toString(),"mime","video/mp4","saved_to",Environment.DIRECTORY_MOVIES+"/Luqta","message","حُفظت نسخة تيك توك. اختر تيك توك من خيارات المشاركة.","width",actual.optInt("width"),"height",actual.optInt("height"),"fps",actual.optDouble("fps"),"size",actual.optLong("size"));
+                synchronized(this){requireTiktokActive(id);ContentValues ready=new ContentValues();ready.put(MediaStore.MediaColumns.IS_PENDING,0);if(resolver.update(uri,ready,null,null)<1) throw new IOException("تعذّر اعتماد نسخة تيك توك.");JSONObject source=jobs.get(id);Json.put(source,"tiktok_copy",saved);Json.put(source,"tiktok_status","ready");Json.put(source,"tiktok_percent",100);persist();}
+                return saved;
+            }catch(Exception e){resolver.delete(uri,null,null);throw e;}
+        }catch(Exception e){
+            synchronized(this){JSONObject source=jobs.get(id);if(source!=null && converting.contains(id) && !"cancelled".equals(source.optString("tiktok_status"))){Json.put(source,"tiktok_status","error");Json.put(source,"tiktok_error",Json.error(e));persist();}}
+            throw e;
+        }finally{
+            if(temporarySource!=null) temporarySource.delete();if(output!=null) output.delete();
+            engine.resetCancellation(id+"-tiktok");
+            synchronized(this){exporting.remove(id);converting.remove(id);}
+            DownloadService.changed(context);
         }
     }
-    JSONObject tiktok(String id) throws Exception {
-        synchronized(exportLocks.computeIfAbsent(id,key -> new Object())){
-            synchronized(this){exporting.add(id);}
-            File temporarySource=null,output=null;
-            try{
-                JSONObject job;
-                synchronized(this){JSONObject source=jobs.get(id);if(source==null || !"done".equals(source.optString("status")) || !"video".equals(source.optString("kind")) || !Arrays.asList("mp4","webm").contains(source.optString("format"))) throw new IOException("هذا العنصر ليس فيديو جاهزًا.");job=new JSONObject(source.toString());}
-                File folder=new File(root,id),local=new File(folder,job.optString("filename"));
-                if(!local.getCanonicalPath().startsWith(folder.getCanonicalPath()+File.separator)) throw new IOException("مسار الفيديو غير صالح.");
-                File cache=new File(context.getCacheDir(),"luqta-tiktok");cache.mkdirs();
-                File input=local;
-                if(!local.isFile()){
-                    String saved=job.optString("export_uri");if(saved.isEmpty()) throw new IOException("الفيديو لم يعد موجودًا. نزّله مجددًا ثم جرّب.");
-                    temporarySource=new File(cache,id+"-source."+job.optString("format","mp4"));
-                    try(InputStream in=context.getContentResolver().openInputStream(Uri.parse(saved));OutputStream out=new FileOutputStream(temporarySource)){if(in==null) throw new IOException("تعذّر قراءة الفيديو المحفوظ.");NativeEngine.copy(in,out);}
-                    input=temporarySource;
-                }
-                if(input.length()<1) throw new IOException("الفيديو فارغ.");
-                if(cache.getUsableSpace()<Math.min(Math.max(input.length()*2,300L*1024*1024),2L*1024*1024*1024)) throw new IOException("المساحة المتاحة لا تكفي لإنشاء نسخة تيك توك.");
-                output=new File(cache,id+"-TikTok.mp4");if(output.exists()) output.delete();
-                engine.tiktok(input,output,id+"-tiktok");
-                String base=job.optString("filename","Luqta").replaceFirst("\\.[^.]+$","");if(base.length()>180) base=base.substring(0,180);
-                ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.DISPLAY_NAME,base+"_TikTok.mp4");values.put(MediaStore.MediaColumns.MIME_TYPE,"video/mp4");values.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/Luqta");values.put(MediaStore.MediaColumns.IS_PENDING,1);
-                ContentResolver resolver=context.getContentResolver();Uri uri=resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,values);if(uri==null) throw new IOException("تعذّر إنشاء نسخة تيك توك في الهاتف.");
-                try{
-                    try(InputStream in=new FileInputStream(output);OutputStream out=resolver.openOutputStream(uri,"w")){if(out==null) throw new IOException("تعذّر حفظ نسخة تيك توك.");NativeEngine.copy(in,out);}
-                    ContentValues ready=new ContentValues();ready.put(MediaStore.MediaColumns.IS_PENDING,0);if(resolver.update(uri,ready,null,null)<1) throw new IOException("تعذّر اعتماد نسخة تيك توك.");
-                    return Json.object("uri",uri.toString(),"mime","video/mp4","saved_to",Environment.DIRECTORY_MOVIES+"/Luqta","message","تم إنشاء نسخة تيك توك بدقة تصل إلى 1080p و60 FPS.");
-                }catch(Exception e){resolver.delete(uri,null,null);throw e;}
-            }finally{
-                if(temporarySource!=null) temporarySource.delete();if(output!=null) output.delete();
-                synchronized(this){exporting.remove(id);}
-            }
-        }
+    private synchronized void requireTiktokActive(String id) throws IOException {JSONObject job=jobs.get(id);if(job==null || !"processing".equals(job.optString("tiktok_status"))) throw new IOException("أُلغي تجهيز نسخة تيك توك.");}
+    synchronized void cancelTiktok(String id){
+        if(!converting.contains(id)) return;
+        JSONObject job=jobs.get(id);if(job!=null && "processing".equals(job.optString("tiktok_status"))){Json.put(job,"tiktok_status","cancelled");job.remove("tiktok_percent");engine.cancel(id+"-tiktok");persist();}
     }
     private JSONObject exportInternal(String id) throws Exception {
         JSONObject job;
@@ -260,10 +282,11 @@ final class JobManager {
     static String savePath(String format){return (Arrays.asList("jpg","jpeg","png","webp").contains(format)?Environment.DIRECTORY_PICTURES:Arrays.asList("mp3","m4a").contains(format)?Environment.DIRECTORY_MUSIC:Environment.DIRECTORY_MOVIES)+"/Luqta";}
     static JSONObject exportResult(Uri uri,String format){return Json.object("uri",uri.toString(),"mime",mime(format),"saved_to",savePath(format));}
     synchronized String notificationText(){
+        for(String id:converting){JSONObject j=jobs.get(id);if(j!=null) return "جاري تجهيز نسخة تيك توك"+(j.isNull("tiktok_percent")?"":" • "+Math.round(j.optDouble("tiktok_percent"))+"%");}
         for(JSONObject j:jobs.values()){String status=j.optString("status");if("downloading".equals(status)) return j.optString("title")+(j.isNull("percent")?"":" • "+Math.round(j.optDouble("percent"))+"%");if("processing".equals(status)) return "جاري تجهيز الملف داخل الهاتف";}
         return activeCount()>0?"التحميلات الجارية: "+activeCount():"توقفت عمليات التحميل";
     }
-    synchronized int notificationProgress(){for(JSONObject j:jobs.values()) if("downloading".equals(j.optString("status")) && !j.isNull("percent")) return (int)Math.round(j.optDouble("percent"));return -1;}
+    synchronized int notificationProgress(){for(String id:converting){JSONObject j=jobs.get(id);if(j!=null && !j.isNull("tiktok_percent")) return (int)Math.round(j.optDouble("tiktok_percent"));}for(JSONObject j:jobs.values()) if("downloading".equals(j.optString("status")) && !j.isNull("percent")) return (int)Math.round(j.optDouble("percent"));return -1;}
     private synchronized boolean persist(){
         AtomicFile storage=new AtomicFile(history);FileOutputStream out=null;
         try{JSONArray data=new JSONArray();for(JSONObject j:jobs.values()){JSONObject copy=new JSONObject(j.toString());if("done".equals(copy.optString("status"))){copy.remove("url");copy.remove("image_url");copy.remove("image_variants");}data.put(copy);}out=storage.startWrite();out.write(data.toString().getBytes("UTF-8"));storage.finishWrite(out);lastPersist=System.currentTimeMillis();return true;}

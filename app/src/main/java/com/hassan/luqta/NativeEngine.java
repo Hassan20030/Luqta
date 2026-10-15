@@ -98,9 +98,9 @@ final class NativeEngine {
         Json.put(request,"cookies",sourceCookies(request.optString("url")));
         return runRaw(request,id,listener,0);
     }
-    JSONObject tiktok(File input,File output,String id) throws Exception {
+    JSONObject tiktok(File input,File output,String id,Listener listener) throws Exception {
         awaitReady();
-        return runRaw(Json.object("mode","tiktok","input",input.getAbsolutePath(),"output",output.getAbsolutePath()),id,null,0);
+        return runRaw(Json.object("mode","tiktok","input",input.getAbsolutePath(),"output",output.getAbsolutePath()),id,listener,0);
     }
     JSONObject update() throws Exception {
         awaitReady();

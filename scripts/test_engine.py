@@ -165,6 +165,44 @@ class EngineTests(unittest.TestCase):
         self.assertEqual((video["codec_name"], video["pix_fmt"]), ("h264", "yuv420p"))
         self.assertLessEqual(float(Fraction(video["avg_frame_rate"])), 60.5)
         self.assertEqual(audio["codec_name"], "aac")
+        self.assertTrue(any(e.get("status") == "processing" and e.get("percent") is not None for e in events))
+
+    def test_tiktok_copy_accepts_odd_dimensions_without_audio(self):
+        source, output = self.root / "odd.mkv", self.root / "odd-tiktok.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc=size=321x641:rate=24:duration=0.25",
+                        "-c:v", "ffv1", "-pix_fmt", "bgr0", "-threads", "1", str(source)], check=True)
+        original = source.read_bytes()
+        code, events = self.run_worker({"mode": "tiktok", "input": str(source), "output": str(output)})
+        self.assertEqual(code, 0, events)
+        video = next(s for s in self.probe(output)["streams"] if s["codec_type"] == "video")
+        self.assertEqual((video["width"], video["height"]), (320, 640))
+        self.assertEqual(video["sample_aspect_ratio"], "1:1")
+        self.assertEqual(float(Fraction(video["avg_frame_rate"])), 24)
+        self.assertIsNone(events[-1]["audio_codec"])
+        self.assertEqual(source.read_bytes(), original)
+
+    def test_tiktok_copy_limits_square_and_portrait_on_both_axes(self):
+        square = self.root / "square.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=blue:s=1400x1400:r=30:d=0.2",
+                        "-c:v", "libx264", "-preset", "ultrafast", "-threads", "1", str(square)], check=True)
+        for name, source, expected in [("square", square, (1080, 1080)), ("portrait", self.root / "dash120/portrait.mp4", (1080, 1920))]:
+            with self.subTest(name=name):
+                output = self.root / (name + "-fitted.mp4")
+                code, events = self.run_worker({"mode": "tiktok", "input": str(source), "output": str(output)})
+                self.assertEqual(code, 0, events)
+                self.assertEqual((events[-1]["width"], events[-1]["height"]), expected)
+                self.assertLessEqual(events[-1]["fps"], 60)
+
+    def test_tiktok_copy_bakes_rotation_once(self):
+        source, rotated, output = [self.root / name for name in ("landscape.mp4", "rotated.mp4", "rotation-tiktok.mp4")]
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=30:duration=0.2",
+                        "-c:v", "libx264", "-threads", "1", str(source)], check=True)
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-display_rotation", "90", "-i", str(source), "-c", "copy", str(rotated)], check=True)
+        code, events = self.run_worker({"mode": "tiktok", "input": str(rotated), "output": str(output)})
+        self.assertEqual(code, 0, events)
+        video = next(s for s in self.probe(output)["streams"] if s["codec_type"] == "video")
+        self.assertEqual((video["width"], video["height"]), (240, 320))
+        self.assertFalse(any(s.get("rotation", 0) for s in video.get("side_data_list", [])))
 
     def test_tiktok_copy_rejects_paths_outside_app_data(self):
         output = self.root / "blocked-copy.mp4"
