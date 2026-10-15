@@ -53,16 +53,18 @@ def main():
  parser.add_argument('--key-alias',default=os.environ.get('LUQTA_SIGNING_ALIAS'))
  parser.add_argument('--password-file',default=os.environ.get('LUQTA_SIGNING_PASSWORD_FILE'))
  parser.add_argument('--key-password-file',default=os.environ.get('LUQTA_SIGNING_KEY_PASSWORD_FILE'))
+ parser.add_argument('--unsigned-output',action='store_true',help='Build an aligned unsigned APK for a separate trusted signing step.')
  args=parser.parse_args()
  if not args.sdk or not args.ecj: parser.error('Specify --sdk and --ecj, or ANDROID_SDK_ROOT and LUQTA_ECJ.')
- if not args.keystore or not args.key_alias or not args.password_file:
+ if not args.unsigned_output and (not args.keystore or not args.key_alias or not args.password_file):
   parser.error('Provide an external --keystore, --key-alias and --password-file. Signing keys are never generated or bundled.')
- key=Path(args.keystore).resolve();password=Path(args.password_file).resolve()
- key_password=Path(args.key_password_file).resolve() if args.key_password_file else password
- for p in (key,password,key_password):
-  if not p.is_file(): parser.error('Missing signing file: '+str(p))
-  if p==ROOT or ROOT in p.parents: parser.error('Keep signing files outside the source project.')
-  if p.stat().st_mode & 0o077: parser.error('Signing files must be private to their owner (chmod 600).')
+ if not args.unsigned_output:
+  key=Path(args.keystore).resolve();password=Path(args.password_file).resolve()
+  key_password=Path(args.key_password_file).resolve() if args.key_password_file else password
+  for p in (key,password,key_password):
+   if not p.is_file(): parser.error('Missing signing file: '+str(p))
+   if p==ROOT or ROOT in p.parents: parser.error('Keep signing files outside the source project.')
+   if p.stat().st_mode & 0o077: parser.error('Signing files must be private to their owner (chmod 600).')
  sdk=Path(args.sdk); compiler=Path(args.ecj)
  tools=sdk/'build-tools/35.0.0'; android=Path(args.platform) if args.platform else sdk/'platforms/android-36/android.jar'
  for p in [compiler,android,tools/'aapt2',tools/'d8',tools/'zipalign',tools/'apksigner']:
@@ -95,6 +97,10 @@ def main():
   for p in (BUILD/'dex').glob('*.dex'): apk.write(p,p.name,compress_type=zipfile.ZIP_DEFLATED)
   for p in (BUILD/'jni/arm64-v8a').glob('*.so'): apk.write(p,'lib/arm64-v8a/'+p.name,compress_type=zipfile.ZIP_STORED)
  command([tools/'zipalign','-P','16','-f','4',unsigned,BUILD/'aligned.apk'])
+ if args.unsigned_output:
+  apk=OUT/'Luqta-Android-unsigned-aligned.apk';shutil.copy2(BUILD/'aligned.apk',apk)
+  print(json.dumps({'apk':str(apk),'bytes':apk.stat().st_size,'sha256':hashlib.sha256(apk.read_bytes()).hexdigest(),'signed':False}),flush=True)
+  return
  apk=OUT/'Luqta-Android.apk'
  signing=[tools/'apksigner','sign','--ks',key,'--ks-key-alias',args.key_alias,'--ks-pass','file:'+str(password)]
  if key_password!=password: signing.extend(['--key-pass','file:'+str(key_password)])

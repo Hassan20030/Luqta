@@ -98,6 +98,10 @@ final class NativeEngine {
         Json.put(request,"cookies",sourceCookies(request.optString("url")));
         return runRaw(request,id,listener,0);
     }
+    JSONObject tiktok(File input,File output,String id) throws Exception {
+        awaitReady();
+        return runRaw(Json.object("mode","tiktok","input",input.getAbsolutePath(),"output",output.getAbsolutePath()),id,null,0);
+    }
     JSONObject update() throws Exception {
         awaitReady();
         synchronized(this) { return updateReadyEngine(); }
@@ -160,6 +164,7 @@ final class NativeEngine {
         env.put("LUQTA_NATIVE_FFMPEG",new File(nativeDir,"libffmpeg.so").getAbsolutePath());
         env.put("LUQTA_NATIVE_FFPROBE",new File(nativeDir,"libffprobe.so").getAbsolutePath());
         env.put("LUQTA_NATIVE_QJS",new File(nativeDir,"libqjs.so").getAbsolutePath());
+        env.put("LUQTA_APP_DATA_DIR",context.getDataDir().getAbsolutePath());
         pb.directory(scripts);
         ScheduledFuture<?> deadline=null;
         StringBuilder stderr=new StringBuilder();

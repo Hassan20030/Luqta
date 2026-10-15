@@ -170,7 +170,7 @@ for address in [('127.0.0.1',443),('10.0.0.1',443),('93.184.216.34',80),('localh
         raise AssertionError('Connection escaped endpoint policy')
 print('actual endpoint checks passed')
 """
-        env = dict(os.environ, PYTHONPATH=str(ENGINE), LUQTA_ALLOW_LOCAL_MEDIA="0")
+        env = dict(os.environ, PYTHONPATH=os.pathsep.join((str(ENGINE),str(ROOT / "app/src/main/res/raw/ytdlp"))), LUQTA_ALLOW_LOCAL_MEDIA="0")
         result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("passed", result.stdout)
@@ -200,7 +200,7 @@ assert status != 0, error
 assert 'not on whitelist' in error, error
 print('Both inputs protected')
 """
-        result = subprocess.run([sys.executable, "-c", code, str(ENGINE / "sample.mp4"), str(malicious), str(self.root / "merge.mp4")], env=dict(os.environ, PYTHONPATH=str(ENGINE), LUQTA_ALLOW_LOCAL_MEDIA="0"), capture_output=True, text=True, timeout=10)
+        result = subprocess.run([sys.executable, "-c", code, str(ENGINE / "sample.mp4"), str(malicious), str(self.root / "merge.mp4")], env=dict(os.environ, PYTHONPATH=os.pathsep.join((str(ENGINE),str(ROOT / "app/src/main/res/raw/ytdlp"))), LUQTA_ALLOW_LOCAL_MEDIA="0"), capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.server.hits, [])
 

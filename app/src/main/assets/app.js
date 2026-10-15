@@ -11,7 +11,7 @@
   function api(path, method = 'GET', body = {}) {
     return new Promise((resolve, reject) => {
       const id = 'n-' + (++next);
-      const timeout = path === '/api/engine/update' ? 180000 : path === '/api/info' ? 150000 : path === '/api/health' ? 100000 : 30000;
+      const timeout = path.endsWith('/tiktok') ? 1800000 : path === '/api/engine/update' ? 180000 : path === '/api/info' ? 150000 : path === '/api/health' ? 100000 : 30000;
       const timer = setTimeout(() => { pending.delete(id); reject(new Error('استغرقت العملية وقتًا طويلًا. تحقق من الاتصال ثم جرّب مجددًا.')); }, timeout);
       pending.set(id, { resolve, reject, timer });
       try { NativeLuqta.postMessage(JSON.stringify({ id, path, method, body })); }
@@ -133,6 +133,7 @@
       try {
         const result = await api('/api/jobs/' + job.id + '/' + action, 'POST');
         if (action === 'export') toast('تم الحفظ في ' + result.saved_to);
+        if (action === 'tiktok') toast(result.message || 'تم إنشاء نسخة متوافقة مع تيك توك.');
         if (action === 'retry') toast('جاري إعادة المحاولة برابط جديد.');
         if (action === 'pause') toast('أُوقف التحميل مؤقتًا؛ الأجزاء محفوظة.');
         if (action === 'resume') toast('جاري استكمال التحميل.');
@@ -173,7 +174,10 @@
         const fill = elem('span'); if (job.percent != null) fill.style.width = Math.min(100, Math.max(0, job.percent)) + '%'; track.append(fill); content.append(track);
       }
       const actions = elem('div', 'job-actions');
-      if (job.status === 'done') for (const [action, label] of [['export', 'حفظ على الجهاز'], ['open', 'فتح'], ['share', 'مشاركة']]) actions.append(jobAction(job, action, label));
+      if (job.status === 'done') {
+        for (const [action, label] of [['export', 'حفظ على الجهاز'], ['open', 'فتح'], ['share', 'مشاركة']]) actions.append(jobAction(job, action, label));
+        if (video) actions.append(jobAction(job, 'tiktok', 'نسخة تيك توك'));
+      }
       if (job.retryable) actions.append(jobAction(job, 'retry', 'إعادة المحاولة'));
       if (job.resumable && !job.resume_requested) actions.append(jobAction(job, 'resume', 'استكمال'));
       if (active(job)) actions.append(jobAction(job, 'pause', 'إيقاف مؤقت'));

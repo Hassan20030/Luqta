@@ -67,7 +67,8 @@ def probe_file(file):
     result = subprocess.run([probe, *LOCAL_INPUT_ARGS, "-v", "error", "-show_streams", "-of", "json", str(file)], capture_output=True, text=True, timeout=30)
     if result.returncode:
         raise ValueError("تعذّر التحقق من الملف الذي أعاده المصدر.")
-    videos = [s for s in json.loads(result.stdout).get("streams", []) if s.get("codec_type") == "video"]
+    streams = json.loads(result.stdout).get("streams", [])
+    videos = [s for s in streams if s.get("codec_type") == "video"]
     if not videos:
         return {"width": None, "height": None, "fps": None, "resolution": None}
     video = videos[0]
@@ -84,7 +85,51 @@ def probe_file(file):
                 break
         except (ValueError, ZeroDivisionError):
             pass
-    return {"width": width, "height": height, "fps": fps, "resolution": min(width, height), "duration": float(video.get("duration") or 0)}
+    audios = [s for s in streams if s.get("codec_type") == "audio"]
+    return {"width": width, "height": height, "fps": fps, "resolution": min(width, height),
+            "duration": float(video.get("duration") or 0), "video_codec": video.get("codec_name"),
+            "pixel_format": video.get("pix_fmt"), "audio_codec": audios[0].get("codec_name") if audios else None}
+
+
+def tiktok_copy(request):
+    """Create a conservative TikTok import copy without cropping the frame."""
+    allowed = Path(os.environ["LUQTA_APP_DATA_DIR"]).resolve()
+    source, output = Path(request["input"]).resolve(), Path(request["output"]).resolve()
+    if allowed not in source.parents or allowed not in output.parents or not source.is_file() or source == output:
+        raise ValueError("مسار ملف التحويل غير صالح.")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    actual = probe_file(source)
+    width, height = actual.get("width"), actual.get("height")
+    if not width or not height:
+        raise ValueError("الفيديو لا يحتوي مسار صورة صالحًا.")
+    if max(width, height) > 1920:
+        ratio = 1920 / max(width, height)
+        width, height = max(2, round(width * ratio / 2) * 2), max(2, round(height * ratio / 2) * 2)
+    filters = [f"scale={width}:{height}:flags=lanczos"]
+    if actual.get("fps") and actual["fps"] > 60.5:
+        filters.append("fps=60")
+    ffmpeg, _ = tools()
+    emit({"status": "processing", "percent": None, "speed": 0, "eta": 0,
+          "message": "جاري إنشاء نسخة متوافقة مع تيك توك"})
+    command = [ffmpeg, *LOCAL_INPUT_ARGS, "-v", "error", "-y", "-i", str(source),
+               "-map", "0:v:0", "-map", "0:a:0?", "-map_metadata", "0", "-vf", ",".join(filters),
+               "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+               "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+               "-movflags", "+faststart", str(output)]
+    result = subprocess.run(command, capture_output=True, text=True, timeout=1800)
+    if result.returncode or not output.is_file() or not output.stat().st_size:
+        output.unlink(missing_ok=True)
+        raise ValueError("تعذّر تجهيز نسخة تيك توك على الهاتف.")
+    compatible = probe_file(output)
+    if compatible.get("video_codec") != "h264" or compatible.get("pixel_format") != "yuv420p" or compatible.get("fps", 0) > 60.5:
+        output.unlink(missing_ok=True)
+        raise ValueError("لم يجتز الملف فحص توافق تيك توك.")
+    if compatible.get("audio_codec") not in (None, "aac"):
+        output.unlink(missing_ok=True)
+        raise ValueError("لم يجتز صوت الملف فحص توافق تيك توك.")
+    emit({"status": "done", "percent": 100, "filename": output.name, "size": output.stat().st_size,
+          "speed": 0, "eta": 0, **compatible})
+    return 0
 
 
 class MediaMetadataPP(yt_dlp.postprocessor.PostProcessor):
@@ -176,6 +221,8 @@ def health():
 def main():
     install_guards()
     request = json.loads(sys.stdin.readline())
+    if request.get("mode") == "tiktok":
+        return tiktok_copy(request)
     if request.get("mode") == "health":
         health()
         return

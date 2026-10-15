@@ -200,6 +200,41 @@ final class JobManager {
             try{return exportInternal(id);}finally{synchronized(this){exporting.remove(id);}}
         }
     }
+    JSONObject tiktok(String id) throws Exception {
+        synchronized(exportLocks.computeIfAbsent(id,key -> new Object())){
+            synchronized(this){exporting.add(id);}
+            File temporarySource=null,output=null;
+            try{
+                JSONObject job;
+                synchronized(this){JSONObject source=jobs.get(id);if(source==null || !"done".equals(source.optString("status")) || !"video".equals(source.optString("kind")) || !Arrays.asList("mp4","webm").contains(source.optString("format"))) throw new IOException("هذا العنصر ليس فيديو جاهزًا.");job=new JSONObject(source.toString());}
+                File folder=new File(root,id),local=new File(folder,job.optString("filename"));
+                if(!local.getCanonicalPath().startsWith(folder.getCanonicalPath()+File.separator)) throw new IOException("مسار الفيديو غير صالح.");
+                File cache=new File(context.getCacheDir(),"luqta-tiktok");cache.mkdirs();
+                File input=local;
+                if(!local.isFile()){
+                    String saved=job.optString("export_uri");if(saved.isEmpty()) throw new IOException("الفيديو لم يعد موجودًا. نزّله مجددًا ثم جرّب.");
+                    temporarySource=new File(cache,id+"-source."+job.optString("format","mp4"));
+                    try(InputStream in=context.getContentResolver().openInputStream(Uri.parse(saved));OutputStream out=new FileOutputStream(temporarySource)){if(in==null) throw new IOException("تعذّر قراءة الفيديو المحفوظ.");NativeEngine.copy(in,out);}
+                    input=temporarySource;
+                }
+                if(input.length()<1) throw new IOException("الفيديو فارغ.");
+                if(cache.getUsableSpace()<Math.min(Math.max(input.length()*2,300L*1024*1024),2L*1024*1024*1024)) throw new IOException("المساحة المتاحة لا تكفي لإنشاء نسخة تيك توك.");
+                output=new File(cache,id+"-TikTok.mp4");if(output.exists()) output.delete();
+                engine.tiktok(input,output,id+"-tiktok");
+                String base=job.optString("filename","Luqta").replaceFirst("\\.[^.]+$","");if(base.length()>180) base=base.substring(0,180);
+                ContentValues values=new ContentValues();values.put(MediaStore.MediaColumns.DISPLAY_NAME,base+"_TikTok.mp4");values.put(MediaStore.MediaColumns.MIME_TYPE,"video/mp4");values.put(MediaStore.MediaColumns.RELATIVE_PATH,Environment.DIRECTORY_MOVIES+"/Luqta");values.put(MediaStore.MediaColumns.IS_PENDING,1);
+                ContentResolver resolver=context.getContentResolver();Uri uri=resolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,values);if(uri==null) throw new IOException("تعذّر إنشاء نسخة تيك توك في الهاتف.");
+                try{
+                    try(InputStream in=new FileInputStream(output);OutputStream out=resolver.openOutputStream(uri,"w")){if(out==null) throw new IOException("تعذّر حفظ نسخة تيك توك.");NativeEngine.copy(in,out);}
+                    ContentValues ready=new ContentValues();ready.put(MediaStore.MediaColumns.IS_PENDING,0);if(resolver.update(uri,ready,null,null)<1) throw new IOException("تعذّر اعتماد نسخة تيك توك.");
+                    return Json.object("uri",uri.toString(),"mime","video/mp4","saved_to",Environment.DIRECTORY_MOVIES+"/Luqta","message","تم إنشاء نسخة تيك توك بدقة تصل إلى 1080p و60 FPS.");
+                }catch(Exception e){resolver.delete(uri,null,null);throw e;}
+            }finally{
+                if(temporarySource!=null) temporarySource.delete();if(output!=null) output.delete();
+                synchronized(this){exporting.remove(id);}
+            }
+        }
+    }
     private JSONObject exportInternal(String id) throws Exception {
         JSONObject job;
         synchronized(this){JSONObject source=jobs.get(id);if(source==null || !"done".equals(source.optString("status"))) throw new IOException("الملف غير جاهز للحفظ.");job=new JSONObject(source.toString());}

@@ -10,6 +10,7 @@ import time
 import tempfile
 import threading
 import unittest
+from fractions import Fraction
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -101,7 +102,7 @@ class EngineTests(unittest.TestCase):
         cls.temp.cleanup()
 
     def run_worker(self, request):
-        env = dict(os.environ, LUQTA_ALLOW_LOCAL_MEDIA="1", LUQTA_NATIVE_FFMPEG="/usr/bin/ffmpeg", LUQTA_NATIVE_FFPROBE="/usr/bin/ffprobe")
+        env = dict(os.environ, LUQTA_ALLOW_LOCAL_MEDIA="1", LUQTA_NATIVE_FFMPEG="/usr/bin/ffmpeg", LUQTA_NATIVE_FFPROBE="/usr/bin/ffprobe", LUQTA_APP_DATA_DIR=str(self.root))
         env.pop("LUQTA_NATIVE_QJS", None)
         result = subprocess.run([sys.executable, str(ENGINE / "worker.py")], input=json.dumps(request),
                                 text=True, capture_output=True, env=env, timeout=60)
@@ -149,6 +150,28 @@ class EngineTests(unittest.TestCase):
         done = events[-1]
         self.assertEqual((done["width"], done["height"], done["resolution"], done["fps"]), (2160, 3840, 2160, 120))
         self.assertTrue((directory / done["filename"]).is_file())
+
+    def test_tiktok_copy_transcodes_codec_audio_pixels_and_fps(self):
+        source, output = self.root / "tiktok-source.webm", self.root / "tiktok-copy.mp4"
+        subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "color=c=blue:s=320x640:r=120:d=1",
+                        "-f", "lavfi", "-i", "sine=frequency=440:duration=1", "-c:v", "libvpx-vp9", "-deadline", "realtime",
+                        "-cpu-used", "8", "-c:a", "libopus", "-shortest", str(source)], check=True)
+        code, events = self.run_worker({"mode": "tiktok", "input": str(source), "output": str(output)})
+        self.assertEqual(code, 0, events)
+        self.assertEqual(events[-1]["status"], "done")
+        streams = self.probe(output)["streams"]
+        video = next(s for s in streams if s["codec_type"] == "video")
+        audio = next(s for s in streams if s["codec_type"] == "audio")
+        self.assertEqual((video["codec_name"], video["pix_fmt"]), ("h264", "yuv420p"))
+        self.assertLessEqual(float(Fraction(video["avg_frame_rate"])), 60.5)
+        self.assertEqual(audio["codec_name"], "aac")
+
+    def test_tiktok_copy_rejects_paths_outside_app_data(self):
+        output = self.root / "blocked-copy.mp4"
+        code, events = self.run_worker({"mode": "tiktok", "input": str(ENGINE / "sample.mp4"), "output": str(output)})
+        self.assertNotEqual(code, 0)
+        self.assertEqual(events[-1]["status"], "error")
+        self.assertFalse(output.exists())
 
     def test_unavailable_120_fps_does_not_save_a_lower_rate(self):
         code, events, directory = self.download(worker.SAMPLE, "mp4", "720", "120")

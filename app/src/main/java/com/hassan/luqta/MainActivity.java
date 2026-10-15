@@ -115,22 +115,23 @@ public final class MainActivity extends Activity {
         if("/api/jobs".equals(path)) {engine.awaitReady();JSONObject queued="image".equals(body.optString("kind"))?engine.jobs.enqueueBatch(engine.imageRequests(body)):Json.object("job_id",engine.jobs.enqueue(body),"count",1);startDownloads();return queued;}
         if("/api/history/clear".equals(path)){engine.jobs.clearHistory();return Json.object("ok",true);}
         if("/api/engine/update".equals(path)) return engine.update();
-        Matcher m=Pattern.compile("/api/jobs/([a-f0-9]{32})/(cancel|pause|resume|retry|export|open|share|remove)").matcher(path);
+        Matcher m=Pattern.compile("/api/jobs/([a-f0-9]{32})/(cancel|pause|resume|retry|export|open|share|tiktok|remove)").matcher(path);
         if(m.matches()) {
             String id=m.group(1),action=m.group(2);
             if("cancel".equals(action)){engine.jobs.cancel(id);return Json.object("ok",true);}
             if("remove".equals(action)){engine.jobs.remove(id);return Json.object("ok",true);}
             if("pause".equals(action)){engine.jobs.stop(id,true);return Json.object("ok",true);}
             if("retry".equals(action) || "resume".equals(action)){engine.awaitReady();engine.jobs.retry(id);startDownloads();return Json.object("job_id",id);}
-            JSONObject saved=engine.jobs.export(id);
-            if("open".equals(action) || "share".equals(action)) {
+            JSONObject saved="tiktok".equals(action)?engine.jobs.tiktok(id):engine.jobs.export(id);
+            if("open".equals(action) || "share".equals(action) || "tiktok".equals(action)) {
                 Uri uri=Uri.parse(saved.getString("uri"));String mime=saved.getString("mime");
                 handler.post(() -> {
                     if(closed) return;
                     try {
-                        Intent intent="share".equals(action)?new Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM,uri):new Intent(Intent.ACTION_VIEW).setDataAndType(uri,mime);
+                        boolean sharing="share".equals(action) || "tiktok".equals(action);
+                        Intent intent=sharing?new Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM,uri):new Intent(Intent.ACTION_VIEW).setDataAndType(uri,mime);
                         intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);intent.setClipData(ClipData.newRawUri("Luqta",uri));
-                        startActivity(Intent.createChooser(intent,"share".equals(action)?"مشاركة الملف":"فتح الملف"));
+                        startActivity(Intent.createChooser(intent,"tiktok".equals(action)?"نشر نسخة تيك توك":sharing?"مشاركة الملف":"فتح الملف"));
                     } catch(Exception e){Toast.makeText(this,"لا يوجد تطبيق مناسب لفتح الملف.",Toast.LENGTH_LONG).show();}
                 });
             }
