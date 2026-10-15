@@ -1,110 +1,112 @@
 {
-  "archive_sha256": "2c0fbab5cddab85ae9186725d3423c0fe15a9293dbf4fc5d61f18416b69514b0",
+  "version": "1.6.0",
+  "archive_bytes": 62111392,
+  "archive_sha256": "9589e22ae141c4c17fdf5801d6d5693ee1980353629756ad1f8845b62226f7af",
   "parts": [
     {
-      "file": "luqta-1.5.1.part-000",
+      "file": "part-000.bin",
       "bytes": 3000000,
-      "sha256": "0f3d4e9dbf6bd0dec5e00356079b4d7b64db26dc008d3c0fcdc3d0454b6289bf"
+      "sha256": "9320f06220c6831cf1b7c7dc54cfd10f56760e7d1ad571c73fa25dcf3f22aa6f"
     },
     {
-      "file": "luqta-1.5.1.part-001",
+      "file": "part-001.bin",
       "bytes": 3000000,
-      "sha256": "5e60c5bfc6bc72602eb09331f3cdc153d0d2054c68867420c5c7c5a929ec53f5"
+      "sha256": "404829721b88ccd9ab2af95b695ca9e7e712e8496b15e5b156968615c789ecdf"
     },
     {
-      "file": "luqta-1.5.1.part-002",
+      "file": "part-002.bin",
       "bytes": 3000000,
-      "sha256": "ef2566811467176db0466cf1eec1dee0eb36f354757a1a82f8d1aeea5cb3f09e"
+      "sha256": "a3ad0505f1e352d1fc0d5ae4c797aed1e73c78520595e5288b3a84afdb07511e"
     },
     {
-      "file": "luqta-1.5.1.part-003",
+      "file": "part-003.bin",
       "bytes": 3000000,
-      "sha256": "3dc77ce59181ae5f0c953f61cf4d75d7a08c910fcfb5487760e748f3cacf2810"
+      "sha256": "da95821431af6765e93db8dd3fa71a095331a9117829ba1d6bb17d48bdb5873e"
     },
     {
-      "file": "luqta-1.5.1.part-004",
+      "file": "part-004.bin",
       "bytes": 3000000,
-      "sha256": "b13cde8e691c46d2e9e596e6fe5ad5d7b092c33d014a41fbf2452a98f87c5cb9"
+      "sha256": "8b30a3608f16ee602505813d205ed67e1f93a7eab0353341199a6bf086516121"
     },
     {
-      "file": "luqta-1.5.1.part-005",
+      "file": "part-005.bin",
       "bytes": 3000000,
-      "sha256": "01ed65c4c30343b8de7c2da955101755337cb328ff53fadbf7739703b3b05940"
+      "sha256": "db00dde2653ebda9e40fd211bb93fff32cb48179e66478ca7dfe235a00f5fb79"
     },
     {
-      "file": "luqta-1.5.1.part-006",
+      "file": "part-006.bin",
       "bytes": 3000000,
-      "sha256": "79f5a92b6e399f098962bcfc3bb208ba8e29f04d4aacbaa3f0389c2c5ee658e7"
+      "sha256": "0f4af2f4b80e4a8848f1e2017570f31b21ddbc90911c7fb71e17def624371609"
     },
     {
-      "file": "luqta-1.5.1.part-007",
+      "file": "part-007.bin",
       "bytes": 3000000,
-      "sha256": "f7756bf7297428f6c7806c0a334700b5f352fa733388cc086b4ca5544efcd01a"
+      "sha256": "c5398105545201b994e401b88b596eec5e3f7b0ee49c977a8ef369fb1b9cca44"
     },
     {
-      "file": "luqta-1.5.1.part-008",
+      "file": "part-008.bin",
       "bytes": 3000000,
-      "sha256": "68b75d4722b1a74cb2af3f21fa433dc2c46ebfa193ffcbec2664137c36017995"
+      "sha256": "c75475a86cadc68fb72c0a7ef5a58ecc47209e973aa69ad7d18f0cc980ba8587"
     },
     {
-      "file": "luqta-1.5.1.part-009",
+      "file": "part-009.bin",
       "bytes": 3000000,
-      "sha256": "1d6e35ed5b015f99e336de9684c75dc3f9fbd4b93ddfe2828a9035498ea6ed56"
+      "sha256": "178b6d33c9bf2b6f5638f3b2e5ab064a5621e45b8aa1d67e074261cb78b80874"
     },
     {
-      "file": "luqta-1.5.1.part-010",
+      "file": "part-010.bin",
       "bytes": 3000000,
-      "sha256": "94f7bf33a689ae43bd549e487c2b16c28a497d1862c375f5e899ffeb287100a0"
+      "sha256": "4bad654f7de776450c78b16e75d5f8c053d731e3bc893ee655f70b8be31dc5f5"
     },
     {
-      "file": "luqta-1.5.1.part-011",
+      "file": "part-011.bin",
       "bytes": 3000000,
-      "sha256": "4ad577aa0bd863285ed98ffa11e038e8d3dfa3115ea6f29597f7d771488b5abc"
+      "sha256": "5967f4ba7df2bf78b35391c5f42526138571752fe2607cae7012aa54bd89367a"
     },
     {
-      "file": "luqta-1.5.1.part-012",
+      "file": "part-012.bin",
       "bytes": 3000000,
-      "sha256": "c51d3e244bea37aa443f375783ff0096d8f3f64e1065949c866dc5e297e38bf5"
+      "sha256": "09e57f2697c1ee17b8cdbf97b5ba2129e26b30054798aa68f580cf2ec9e60f40"
     },
     {
-      "file": "luqta-1.5.1.part-013",
+      "file": "part-013.bin",
       "bytes": 3000000,
-      "sha256": "0cbc144c21198b1bf2c3727c9517188065156b0db2bf8b611e0fac754b9c9420"
+      "sha256": "c286f944091e4879c2f150d116aded02eb7fe5881e1bd6d3254962096d3b6636"
     },
     {
-      "file": "luqta-1.5.1.part-014",
+      "file": "part-014.bin",
       "bytes": 3000000,
-      "sha256": "24e102d2fcbe7416ac341d20b38a918800be4c281a836337ea968b35823b6bc3"
+      "sha256": "eed5c83f88b2e31205437ea41a2337f98479a57644d38793222355eeb3719dab"
     },
     {
-      "file": "luqta-1.5.1.part-015",
+      "file": "part-015.bin",
       "bytes": 3000000,
-      "sha256": "0a980059dd8e367161fffb0ffc6fd916ef80ed458064dd7c38f2101dfdbe9f10"
+      "sha256": "f022779d2cc4dbbdfebd57f3da85110d2ca11918a78d77649f7fbe62d923dff5"
     },
     {
-      "file": "luqta-1.5.1.part-016",
+      "file": "part-016.bin",
       "bytes": 3000000,
-      "sha256": "a9e46319aae6154c1ed1fa45a667515c359ecd01e712f02f181f86f0355466c5"
+      "sha256": "11bf4c08dbdde43085ad374447b72f44d87985d036b0aa0057c24d4b9aa49f04"
     },
     {
-      "file": "luqta-1.5.1.part-017",
+      "file": "part-017.bin",
       "bytes": 3000000,
-      "sha256": "97fe835b8f3ef8e6a75d77d006d6df578348a62d404ce926dae8275db98fb8e4"
+      "sha256": "ce62299ee7e0679071a2d59fd93cb1ce42de71b3a68ec2c2b07d5104b1d1348c"
     },
     {
-      "file": "luqta-1.5.1.part-018",
+      "file": "part-018.bin",
       "bytes": 3000000,
-      "sha256": "a66ee5f5ac06c2d98f443f3036a4de06d1911f5d1a0a4e0a66c48fc19cb8617a"
+      "sha256": "a2e7dfb9ab4e94d434a886981a4c21e383cf156b515582894f9ff449f35a727d"
     },
     {
-      "file": "luqta-1.5.1.part-019",
+      "file": "part-019.bin",
       "bytes": 3000000,
-      "sha256": "a52cf16edcbba90ec37f6262fef91e49408375ab8140ecd20d061ecaf61ca8d6"
+      "sha256": "eb5b74a527805cdb25093388c3668d9ee76ce9c05fb5b62c1df6d787c56d4f17"
     },
     {
-      "file": "luqta-1.5.1.part-020",
-      "bytes": 674835,
-      "sha256": "ae26b40e61190153439cb6aad903337c81dc2f0107b6c99fef2ba56bf41ff574"
+      "file": "part-020.bin",
+      "bytes": 2111392,
+      "sha256": "ca9c891ccfae0dbdb91def0931e1c80af24e851af4660f20a16cd5fd60ea4b0b"
     }
   ]
 }

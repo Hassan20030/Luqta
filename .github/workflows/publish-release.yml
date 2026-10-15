@@ -9,7 +9,7 @@ on:
 permissions:
   contents: write
 concurrency:
-  group: publish-luqta-1.5.1
+  group: publish-luqta-1.6.0
   cancel-in-progress: false
 jobs:
   release:
@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Unpack and verify prepared files
         env:
-          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.5.1
+          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.6.0
         run: |
           python3 - <<'PY'
           import hashlib, json, os, zipfile
@@ -26,8 +26,8 @@ jobs:
           folder = Path(os.environ['RELEASE_DIR'])
           folder.mkdir(parents=True, exist_ok=True)
           expected = {
-              'Luqta-Android.apk': '8885a0968afade076b26322e0c975a6d38db40f5baafbe3b05bc103536e8ba3f',
-              'Luqta-Android-Source.zip': 'fae4e4749fa8e77834ee9439b8827502e58bbd8387580b5e9b03a6ab4464abb8',
+              'Luqta-Android.apk': '0064908e34147a2ac9accac0d3edbd77549030e858e48c24cb574f3a9d9ad645',
+              'Luqta-Android-Source.zip': '4064827e425074243d95d6078f5844ecc1cb9a1724e277335eb65d06b1ea4786',
           }
           parts = Path('downloads/parts')
           manifest = json.loads((parts / 'manifest.json').read_text())
@@ -57,13 +57,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.5.1
+          RELEASE_DIR: ${{ runner.temp }}/luqta-release-1.6.0
         run: |
           set -euo pipefail
-          gh release create v1.5.1 \
+          gh release create v1.6.0 \
             "$RELEASE_DIR/Luqta-Android.apk" \
             "$RELEASE_DIR/Luqta-Android-Source.zip" \
             "$RELEASE_DIR/SHA256SUMS" \
             --target "$GITHUB_SHA" \
-            --title "لُقطة 1.5.1" \
-            --notes-file docs/release-1.5.1.md
+            --title "لُقطة 1.6.0" \
+            --notes-file docs/release-1.6.0.md
