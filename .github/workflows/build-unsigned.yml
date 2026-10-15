@@ -23,9 +23,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - name: Install Android tools and compiler
         run: |
+          yes | sdkmanager --licenses >/dev/null
           yes | sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
           curl --fail --location --retry 3 --output ecj.jar https://repo.maven.apache.org/maven2/org/eclipse/jdt/ecj/3.38.0/ecj-3.38.0.jar
       - name: Build aligned APK
